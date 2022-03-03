@@ -9,6 +9,19 @@ import matplotlib.pyplot as plt
 class GreedyStrategy:
     def __init__(self, df_train, target, var_dict, expected_pass_rate, initial_pass_rate=0.98, cached_y_pred=None,
                  df_test=None, show=True, save_path=None, logging=True):
+        """
+        初始化
+        :param df_train: 训练集
+        :param target: 目标变量
+        :param var_dict: 变量方向字典
+        :param expected_pass_rate: 目标通过率
+        :param initial_pass_rate: 初始通过率
+        :param cached_y_pred: 前置规则预测结果
+        :param df_test: 测试集
+        :param show: 是否画图
+        :param save_path: 图片保存路径
+        :param logging: 是否打印日志
+        """
         self.df_train = df_train
         self.target = target
         self.var_dict = var_dict
@@ -20,6 +33,15 @@ class GreedyStrategy:
         self.save_path = save_path
         self.logging = logging
         self.cut_off_dict = None
+
+        # 1.如果单条规则在目标通过率的情况下没有坏样本则不考虑该变量
+        # 2.如果单条规则通过率达不到目标通过率也不考虑该变量（比如变量只有1个值）
+        ordered_rule = self.get_ordered_var_by_pass_rate(current_pass_rate=self.expected_pass_rate,
+                                                         cached_y_pred=self.cached_y_pred)
+        self.var_dict = OrderedDict()
+        for var, [_, recall] in ordered_rule:
+            if recall != 0:
+                self.var_dict[var] = var_dict[var]
 
     @staticmethod
     def combine_two_list_by_or(list1, list2):
@@ -210,7 +232,7 @@ class GreedyStrategy:
         plt.ylabel('百分比')
         plt.plot(step_list, pass_rate_list, label='通过率')
         plt.plot(step_list, recall_list, label='召回率')
-        plt.axhline(y=self.expected_pass_rate, ls="--", c='black', label='期望通过率{}'.format(self.expected_pass_rate))
+        plt.axhline(y=self.expected_pass_rate, ls="--", c='black', label='目标通过率{}'.format(self.expected_pass_rate))
         plt.legend(loc='best')
         plt.grid(ls=":", c='b')
         plt.title('贪心算法')
@@ -263,18 +285,20 @@ class GreedyStrategy:
                 cut_off_dict[var] = init_cut_off
         return cut_off_dict
 
-    def get_rule_detail(self, rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum):
+    def get_rule_detail(self, rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum, cut_off_dict=None):
         """
         得到规则明细
         :param rule_pass_rate_and_recall: 单条规则
         :param rule_pass_rate_and_recall_cum: 累计情况
+        :param cut_off_dict: 阈值
         :return:
         """
+        cut_off_dict = self.cut_off_dict if cut_off_dict is None else cut_off_dict
         rule_pass_rate_and_recall = pd.DataFrame(rule_pass_rate_and_recall).T
         rule_pass_rate_and_recall_cum = pd.DataFrame(rule_pass_rate_and_recall_cum).T
         rule_detail = pd.concat([rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum], axis=1)
         rule_detail.columns = ['单条规则通过率', '单条规则召回率', '累计通过率', '累计召回率']
-        for var, cut_off in self.cut_off_dict.items():
+        for var, cut_off in cut_off_dict.items():
             if self.var_dict[var] == 1:
                 rule_name = '{} > {}'.format(var, cut_off)
             else:
@@ -287,35 +311,37 @@ class GreedyStrategy:
 
     def fit(self):
         """
-        通过训练集找出最优切点，并计算整体通过情况和规则明细
+        通过训练集找出最优阈值，并计算整体通过情况和规则明细
         :return:
         """
         cut_off_dict = self.fine_tune()
         self.cut_off_dict = cut_off_dict
 
-        rule_pass_rate_and_recall = self.get_rule_pass_rate_and_recall(self.cut_off_dict)
-        rule_pass_rate_and_recall_cum = self.get_rule_pass_rate_and_recall(self.cut_off_dict, is_cum=True)
+        rule_pass_rate_and_recall = self.get_rule_pass_rate_and_recall(cut_off_dict)
+        rule_pass_rate_and_recall_cum = self.get_rule_pass_rate_and_recall(cut_off_dict, is_cum=True)
         self.plot_result(rule_pass_rate_and_recall_cum)
 
-        rule_detail = self.get_rule_detail(rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum)
-        all_rule_pass_rate_and_recall = self.get_all_rule_pass_rate_and_recall(self.cut_off_dict)
+        rule_detail = self.get_rule_detail(rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum, cut_off_dict)
+        all_rule_pass_rate_and_recall = self.get_all_rule_pass_rate_and_recall(cut_off_dict)
 
         return all_rule_pass_rate_and_recall, rule_detail
 
-    def predict(self, df=None):
+    def predict(self, df=None, cut_off_dict=None):
         """
         将训练集找出的最优规则集应用与测试集，并计算测试集整体通过情况和规则明细
-        :param df:
+        :param df: 数据集
+        :param cut_off_dict: 阈值
         :return:
         """
         if df is None:
             df = self.df_test or self.df_train
+        cut_off_dict = self.cut_off_dict if cut_off_dict is None else cut_off_dict
 
-        rule_pass_rate_and_recall = self.get_rule_pass_rate_and_recall(self.cut_off_dict, df)
-        rule_pass_rate_and_recall_cum = self.get_rule_pass_rate_and_recall(self.cut_off_dict, df, is_cum=True)
+        rule_pass_rate_and_recall = self.get_rule_pass_rate_and_recall(cut_off_dict, df)
+        rule_pass_rate_and_recall_cum = self.get_rule_pass_rate_and_recall(cut_off_dict, df, is_cum=True)
         self.plot_result(rule_pass_rate_and_recall_cum)
 
-        rule_detail = self.get_rule_detail(rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum)
-        all_rule_pass_rate_and_recall = self.get_all_rule_pass_rate_and_recall(self.cut_off_dict, df)
+        rule_detail = self.get_rule_detail(rule_pass_rate_and_recall, rule_pass_rate_and_recall_cum, cut_off_dict)
+        all_rule_pass_rate_and_recall = self.get_all_rule_pass_rate_and_recall(cut_off_dict, df)
 
         return all_rule_pass_rate_and_recall, rule_detail
