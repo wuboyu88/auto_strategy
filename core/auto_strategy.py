@@ -91,7 +91,8 @@ class GreedyStrategy:
 
                 while len(search_domain) > 0:
                     lower_bound = search_domain[0]
-                    y_pred = self.df_train[var].apply(lambda x: 1 if x > lower_bound else 0).tolist()
+                    y_pred = np.where(self.df_train[var] > lower_bound, 1, 0).tolist()
+                    # y_pred = self.df_train[var].apply(lambda x: 1 if x > lower_bound else 0).tolist()
 
                     if cached_y_pred is not None:
                         y_pred = self.combine_two_list_by_or(y_pred, cached_y_pred)
@@ -108,7 +109,8 @@ class GreedyStrategy:
 
                 while len(search_domain) > 0:
                     upper_bound = search_domain[-1]
-                    y_pred = self.df_train[var].apply(lambda x: 1 if x < upper_bound else 0).tolist()
+                    y_pred = np.where(self.df_train[var] < upper_bound, 1, 0).tolist()
+                    # y_pred = self.df_train[var].apply(lambda x: 1 if x < upper_bound else 0).tolist()
 
                     if cached_y_pred is not None:
                         y_pred = self.combine_two_list_by_or(y_pred, cached_y_pred)
@@ -147,9 +149,11 @@ class GreedyStrategy:
 
             for cut_off in search_domain:
                 if self.var_dict[var] == 1:
-                    y_pred = self.df_train[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
+                    y_pred = np.where(self.df_train[var] > cut_off, 1, 0).tolist()
+                    # y_pred = self.df_train[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
                 else:
-                    y_pred = self.df_train[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
+                    y_pred = np.where(self.df_train[var] < cut_off, 1, 0).tolist()
+                    # y_pred = self.df_train[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
                 if cached_y_pred is not None:
                     y_pred = self.combine_two_list_by_or(y_pred, cached_y_pred)
                 pass_rate, recall = self.get_pass_rate_and_recall(y_true, y_pred)
@@ -183,9 +187,11 @@ class GreedyStrategy:
         cached_y_pred = self.cached_y_pred
         for var, cut_off in cut_off_dict.items():
             if self.var_dict[var] == 1:
-                y_pred = df[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
+                y_pred = np.where(df[var] > cut_off, 1, 0).tolist()
+                # y_pred = df[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
             else:
-                y_pred = df[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
+                y_pred = np.where(df[var] < cut_off, 1, 0).tolist()
+                # y_pred = df[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
             if is_cum and cached_y_pred:
                 y_pred = self.combine_two_list_by_or(y_pred, cached_y_pred)
             cached_y_pred = y_pred
@@ -204,9 +210,11 @@ class GreedyStrategy:
         tmp = None
         for var, cut_off in cut_off_dict.items():
             if self.var_dict[var] == 1:
-                y_pred = df[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
+                y_pred = np.where(df[var] > cut_off, 1, 0).tolist()
+                # y_pred = df[var].apply(lambda x: 1 if x > cut_off else 0).tolist()
             else:
-                y_pred = df[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
+                y_pred = np.where(df[var] < cut_off, 1, 0).tolist()
+                # y_pred = df[var].apply(lambda x: 1 if x < cut_off else 0).tolist()
             if tmp is None:
                 tmp = y_pred
             else:
