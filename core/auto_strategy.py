@@ -23,6 +23,7 @@ class GreedyStrategy:
         :param logging: 是否打印日志
         """
         self.df_train = df_train
+        self.df_train_bad = self.df_train[self.df_train[target] == 1]
         self.target = target
         self.var_dict = var_dict
         self.expected_pass_rate = expected_pass_rate
@@ -84,10 +85,11 @@ class GreedyStrategy:
         y_true = self.df_train[self.target]
         used_var_dict = self.var_dict if used_var_dict is None else used_var_dict
         for var, sign in used_var_dict.items():
+            print(var)
             values = self.df_train[var].tolist()
             if sign == 1:
                 tmp = np.percentile(values, current_pass_rate * 100)
-                search_domain = sorted(set([ele for ele in values if ele > tmp]))
+                search_domain = sorted(self.df_train_bad[self.df_train_bad[var] > tmp][var].unique())
 
                 while len(search_domain) > 0:
                     lower_bound = search_domain[0]
@@ -105,7 +107,7 @@ class GreedyStrategy:
 
             else:
                 tmp = np.percentile(values, (1 - current_pass_rate) * 100)
-                search_domain = sorted(set([ele for ele in values if ele < tmp]))
+                search_domain = sorted(self.df_train_bad[self.df_train_bad[var] < tmp][var].unique())
 
                 while len(search_domain) > 0:
                     upper_bound = search_domain[-1]
@@ -138,6 +140,7 @@ class GreedyStrategy:
 
         i = 0
         while i < len(self.var_dict):
+            print('***************************************', i, '/', len(self.var_dict))
             current_pass_rate = self.initial_pass_rate - (self.initial_pass_rate - self.expected_pass_rate) / len(
                 self.var_dict) * i
             ordered_var = self.get_ordered_var_by_pass_rate(current_pass_rate, used_var_dict, cached_y_pred)
@@ -260,7 +263,7 @@ class GreedyStrategy:
         """
         greedy_cut_off_dict = self.get_greedy_cut_off_dynamic()
         used_var_dict = {}
-        for var in self.get_greedy_cut_off_dynamic().keys():
+        for var in greedy_cut_off_dict.keys():
             used_var_dict[var] = self.var_dict[var]
 
         ordered_var = self.get_ordered_var_by_pass_rate(self.expected_pass_rate, used_var_dict, self.cached_y_pred)
